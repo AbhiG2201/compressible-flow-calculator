@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compressible Flow Calculator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #080c10;
+      --panel: #0d1117;
+      --border: #1e2730;
+      --border2: #2a3540;
+      --accent: #00d4ff;
+      --accent2: #ff6b35;
+      --accent3: #39d353;
+      --text: #cdd9e5;
+      --muted: #4a5568;
+      --muted2: #768390;
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'IBM Plex Sans', sans-serif;
+      --r: 4px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── HEADER ── */
+    header {
+      position: relative;
+      z-index: 10;
+      border-bottom: 1px solid var(--border);
+      padding: 1.2rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(8,12,16,0.9);
+      backdrop-filter: blur(8px);
+    }
+    .header-left { display: flex; align-items: center; gap: 1rem; }
+    .logo {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--accent);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      border: 1px solid var(--accent);
+      padding: 0.25rem 0.6rem;
+      border-radius: var(--r);
+    }
+    .header-title {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--text);
+      letter-spacing: 0.05em;
+    }
+    .header-badge {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted2);
+      letter-spacing: 0.1em;
+    }
+
+    /* ── LAYOUT ── */
+    .app {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      position: sticky;
+      top: 1rem;
+    }
+    .sidebar-label {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 0 0.5rem;
+      margin-bottom: 0.3rem;
+      margin-top: 0.8rem;
+    }
+    .sidebar-label:first-child { margin-top: 0; }
+
+    .mode-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.7rem 0.9rem;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      color: var(--muted2);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: left;
+      letter-spacing: 0.02em;
+    }
+    .mode-btn:hover { border-color: var(--border2); color: var(--text); }
+    .mode-btn.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(0,212,255,0.05);
+    }
+    .mode-btn .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+
+    /* ── MAIN ── */
+    .main { display: flex; flex-direction: column; gap: 1.5rem; }
+
+    /* ── PANEL ── */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.9rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+    }
+    .panel-title {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--accent);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .panel-sub {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted);
+    }
+    .panel-body { padding: 1.2rem; }
+
+    /* ── INPUTS ── */
+    .input-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .input-row.single { grid-template-columns: 1fr; }
+    .input-row.triple { grid-template-columns: 1fr 1fr 1fr; }
+
+    .field { display: flex; flex-direction: column; gap: 0.3rem; }
+    .field label {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted2);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .field-wrap {
+      display: flex;
+      align-items: center;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+    .field-wrap:focus-within { border-color: var(--accent); }
+    .field-wrap input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 0.55rem 0.75rem;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--text);
+      width: 100%;
+    }
+    .field-unit {
+      padding: 0 0.6rem;
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted);
+      border-left: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      outline: none;
+      padding: 0.55rem 0.75rem;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--text);
+      width: 100%;
+      cursor: pointer;
+    }
+    select:focus { border-color: var(--accent); }
+
+    /* ── CALC BTN ── */
+    .calc-btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--accent);
+      color: #080c10;
+      border: none;
+      border-radius: var(--r);
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-top: 0.25rem;
+    }
+    .calc-btn:hover { background: #33ddff; transform: translateY(-1px); }
+    .calc-btn:active { transform: translateY(0); }
+
+    /* ── RESULTS ── */
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.6rem;
+    }
+    .result-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 0.9rem 1rem;
+      transition: border-color 0.2s;
+    }
+    .result-card.highlight { border-color: var(--accent); background: rgba(0,212,255,0.04); }
+    .result-card .r-label {
+      font-family: var(--mono);
+      font-size: 0.6rem;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 0.3rem;
+    }
+    .result-card .r-val {
+      font-family: var(--mono);
+      font-size: 1.15rem;
+      font-weight: 500;
+      color: var(--text);
+    }
+    .result-card.highlight .r-val { color: var(--accent); }
+    .result-card .r-unit {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted);
+      margin-top: 0.15rem;
+    }
+
+    /* ── EQUATION DISPLAY ── */
+    .eq-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent2);
+      border-radius: var(--r);
+      padding: 0.8rem 1rem;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--muted2);
+      line-height: 1.8;
+      margin-bottom: 0.75rem;
+    }
+    .eq-box .eq-title {
+      font-size: 0.65rem;
+      color: var(--accent2);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+    }
+
+    /* ── REGIME BADGE ── */
+    .regime-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.3rem 0.7rem;
+      border-radius: 2px;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+    }
+    .regime-subsonic  { background: rgba(57,211,83,0.12);  color: var(--accent3); border: 1px solid rgba(57,211,83,0.25); }
+    .regime-transonic { background: rgba(255,107,53,0.12); color: var(--accent2); border: 1px solid rgba(255,107,53,0.25); }
+    .regime-supersonic{ background: rgba(0,212,255,0.12);  color: var(--accent);  border: 1px solid rgba(0,212,255,0.25); }
+    .regime-hypersonic{ background: rgba(180,80,255,0.12); color: #c084fc;        border: 1px solid rgba(180,80,255,0.25); }
+
+    /* ── SHOCK TABLE ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+    }
+    th {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.65rem;
+      color: var(--muted2);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 0.55rem 0.75rem;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    td.accent { color: var(--accent); }
+    td.orange { color: var(--accent2); }
+
+    /* ── EMPTY STATE ── */
+    .empty {
+      text-align: center;
+      padding: 2.5rem;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.4; }
+
+    /* ── TABS ── */
+    .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+    .tab {
+      padding: 0.65rem 1.1rem;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--muted2);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+      letter-spacing: 0.05em;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── SECTION HIDDEN ── */
+    .calc-section { display: none; }
+    .calc-section.visible { display: block; }
+
+    /* ── MACH VISUAL ── */
+    .mach-visual {
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 0.5rem 0;
+    }
+    .mach-bar {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.4s ease, background 0.4s ease;
+    }
+
+    @media (max-width: 760px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { position: static; flex-direction: row; flex-wrap: wrap; }
+      .results-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <span class="logo">CFD</span>
+    <span class="header-title">Compressible Flow Calculator</span>
+  </div>
+  <span class="header-badge">γ = 1.4 · Perfect Gas</span>
+</header>
+
+<div class="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-label">Flow Relations</div>
+    <button class="mode-btn active" onclick="switchMode('isentropic')" id="btn-isentropic">
+      <span class="dot"></span>Isentropic Flow
+    </button>
+    <button class="mode-btn" onclick="switchMode('normal_shock')" id="btn-normal_shock">
+      <span class="dot"></span>Normal Shock
+    </button>
+    <button class="mode-btn" onclick="switchMode('oblique_shock')" id="btn-oblique_shock">
+      <span class="dot"></span>Oblique Shock
+    </button>
+    <button class="mode-btn" onclick="switchMode('fanno')" id="btn-fanno">
+      <span class="dot"></span>Fanno Flow
+    </button>
+    <button class="mode-btn" onclick="switchMode('rayleigh')" id="btn-rayleigh">
+      <span class="dot"></span>Rayleigh Flow
+    </button>
+    <div class="sidebar-label">Tools</div>
+    <button class="mode-btn" onclick="switchMode('mach_table')" id="btn-mach_table">
+      <span class="dot"></span>Mach Table
+    </button>
+    <button class="mode-btn" onclick="switchMode('area_mach')" id="btn-area_mach">
+      <span class="dot"></span>Area–Mach Solver
+    </button>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+
+    <!-- ════ ISENTROPIC ════ -->
+    <div class="calc-section visible" id="sec-isentropic">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Isentropic Flow Relations</span>
+          <span class="panel-sub">P/P₀ · T/T₀ · ρ/ρ₀ · A/A*</span>
+        </div>
+        <div class="panel-body">
+          <div class="eq-box">
+            <div class="eq-title">Key Relations</div>
+            T₀/T = 1 + (γ-1)/2 · M²<br>
+            P₀/P = (T₀/T)^(γ/(γ-1))<br>
+            ρ₀/ρ = (T₀/T)^(1/(γ-1))<br>
+            A/A* = (1/M)·[(2/(γ+1))·(1+(γ-1)/2·M²)]^((γ+1)/(2(γ-1)))
+          </div>
+          <div class="input-row">
+            <div class="field">
+              <label>Mach Number</label>
+              <div class="field-wrap">
+                <input type="number" id="iso-mach" placeholder="e.g. 2.0" step="0.01" min="0" />
+                <span class="field-unit">M</span>
+              </div>
+            </div>
+            <div class="field">
+              <label>Ratio of Specific Heats γ</label>
+              <div class="field-wrap">
+                <input type="number" id="iso-gamma" value="1.4" step="0.01" min="1" />
+                <span class="field-unit">—</span>
+              </div>
+            </div>
+          </div>
+          <button class="calc-btn" onclick="calcIsentropic()">Calculate →</button>
+        </div>
+      </div>
+      <div class="panel" id="iso-results" style="display:none">
+        <div class="panel-header">
+          <span class="panel-title">Results</span>
+          <span id="iso-regime-badge"></span>
+        </div>
+        <div class="panel-body">
+          <div class="mach-visual"><div class="mach-bar" id="iso-mach-bar"></div></div>
+          <div class="results-grid" id="iso-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ NORMAL SHOCK ════ -->
+    <div class="calc-section" id="sec-normal_shock">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Normal Shock Relations</span>
+          <span class="panel-sub">Upstream → Downstream</span>
+        </div>
+        <div class="panel-body">
+          <div class="eq-box">
+            <div class="eq-title">Rankine–Hugoniot Relations</div>
+            M₂² = (M₁²+(2/(γ-1))) / (2γ/(γ-1)·M₁²−1)<br>
+            P₂/P₁ = 1 + 2γ/(γ+1)·(M₁²−1)<br>
+            T₂/T₁ = P₂/P₁ · ρ₁/ρ₂<br>
+            P₀₂/P₀₁ = [(ρ₂/ρ₁)^(γ/(γ-1))] / (P₂/P₁)^(1/(γ-1))
+          </div>
+          <div class="input-row">
+            <div class="field">
+              <label>Upstream Mach M₁</label>
+              <div class="field-wrap">
+                <input type="number" id="ns-mach" placeholder="e.g. 2.5" step="0.01" min="1" />
+                <span class="field-unit">M₁</span>
+              </div>
+            </div>
+            <div class="field">
+              <label>γ</label>
+              <div class="field-wrap">
+                <input type="number" id="ns-gamma" value="1.4" step="0.01" min="1" />
+                <span class="field-unit">—</span>
+              </div>
+            </div>
+          </div>
+          <button class="calc-btn" onclick="calcNormalShock()">Calculate →</button>
+        </div>
+      </div>
+      <div class="panel" id="ns-results" style="display:none">
+        <div class="panel-header"><span class="panel-title">Shock Properties</span></div>
+        <div class="panel-body">
+          <div class="results-grid" id="ns-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ OBLIQUE SHOCK ════ -->
+    <div class="calc-section" id="sec-oblique_shock">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Oblique Shock Relations</span>
+          <span class="panel-sub">θ–β–M relation</span>
+        </div>
+        <div class="panel-body">
+          <div class="eq-box">
+            <div class="eq-title">θ–β–M Relation</div>
+            tan(θ) = 2·cot(β)·(M₁²sin²β−1)/(M₁²(γ+cos2β)+2)<br>
+            Mn₁ = M₁·sin(β) → use normal shock with Mn₁<br>
+            M₂ = Mn₂ / sin(β−θ)
+          </div>
+          <div class="input-row triple">
+            <div class="field">
+              <label>Upstream Mach M₁</label>
+              <div class="field-wrap">
+                <input type="number" id="ob-mach" placeholder="2.0" step="0.1" min="1" />
+                <span class="field-unit">M₁</span>
+              </div>
+            </div>
+            <div class="field">
+              <label>Deflection Angle θ</label>
+              <div class="field-wrap">
+                <input type="number" id="ob-theta" placeholder="15" step="0.5" min="0" max="45" />
+                <span class="field-unit">deg</span>
+              </div>
+            </div>
+            <div class="field">
+              <label>γ</label>
+              <div class="field-wrap">
+                <input type="number" id="ob-gamma" value="1.4" step="0.01" />
+                <span class="field-unit">—</span>
+              </div>
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:0.75rem">
+            <label>Shock Solution</label>
+            <select id="ob-solution">
+              <option value="weak">Weak Shock (typical)</option>
+              <option value="strong">Strong Shock</option>
+            </select>
+          </div>
+          <button class="calc-btn" onclick="calcObliqueShock()">Calculate →</button>
+        </div>
+      </div>
+      <div class="panel" id="ob-results" style="display:none">
+        <div class="panel-header"><span class="panel-title">Oblique Shock Properties</span></div>
+        <div class="panel-body">
+          <div class="results-grid" id="ob-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ FANNO ════ -->
+    <div class="calc-section" id="sec-fanno">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Fanno Flow</span>
+          <span class="panel-sub">Adiabatic duct with friction</span>
+        </div>
+        <div class="panel-body">
+          <div class="eq-box">
+            <div class="eq-title">Fanno Relations (to sonic *)</div>
+            4fL*/D = (1−M²)/(γM²) + (γ+1)/(2γ)·ln[(γ+1)M²/(2+(γ-1)M²)]<br>
+            T/T* = (γ+1) / (2+(γ-1)M²)<br>
+            P/P* = (1/M)·√(T/T*)<br>
+            P₀/P₀* = (1/M)·[(2/(γ+1))·(1+(γ-1)/2·M²)]^((γ+1)/(2(γ-1)))
+          </div>
+          <div class="input-row">
+            <div class="field">
+              <label>Mach Number</label>
+              <div class="field-wrap">
+                <input type="number" id="fa-mach" placeholder="e.g. 0.5" step="0.01" min="0.01" />
+                <span class="field-unit">M</span>
+              </div>
+            </div>
+            <div class="field">
+              <label>γ</label>
+              <div class="field-wrap">
+                <input type="number" id="fa-gamma" value="1.4" step="0.01" />
+                <span class="field-unit">—</span>
+              </div>
+            </div>
+          </div>
+          <button class="calc-btn" onclick="calcFanno()">Calculate →</button>
+        </div>
+      </div>
+      <div class="panel" id="fa-results" style="display:none">
+        <div class="panel-header"><span class="panel-title">Fanno Properties</span></div>
+        <div class="panel-body"><div class="results-grid" id="fa-grid"></div></div>
+      </div>
+    </div>
+
+    <!-- ════ RAYLEIGH ════ -->
+    <div class="calc-section" id="sec-rayleigh">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Rayleigh Flow</span>
+          <span class="panel-sub">Frictionless duct with heat transfer</span>
+        </div>
+        <div class="panel-body">
+          <div class="eq-box">
+            <div class="eq-title">Rayleigh Relations (to sonic *)</div>
+            T/T* = M²·[(2(γ+1))/(1+γM²)]²<br>
+            P/P* = (γ+1)/(1+γM²)<br>
+            T₀/T₀* = 2(γ+1)M²·(2+(γ-1)M²) / (1+γM²)²<br>
+            P₀/P₀* = (γ+1)/(1+γM²)·[(2/(γ+1))·(1+(γ-1)/2·M²)]^(γ/(γ-1))
+          </div>
+          <div class="input-row">
+            <div class="field">
+              <label>Mach Number</label>
+              <div class="field-wrap">
+                <input type="number" id="ra-mach" placeholder="e.g. 0.8" step="0.01" min="0.01" />
+                <span class="field-unit">M</span>
+              </div>
+            </div>
+            <div class="field">
+              <label>γ</label>
+              <div class="field-wrap">
+                <input type="number" id="ra-gamma" value="1.4" step="0.01" />
+                <span class="field-unit">—</span>
+              </div>
+            </div>
+          </div>
+          <button class="calc-btn" onclick="calcRayleigh()">Calculate →</button>
+        </div>
+      </div>
+      <div class="panel" id="ra-results" style="display:none">
+        <div class="panel-header"><span class="panel-title">Rayleigh Properties</span></div>
+        <div class="panel-body"><div class="results-grid" id="ra-grid"></div></div>
+      </div>
+    </div>
+
+    <!-- ════ MACH TABLE ════ -->
+    <div class="calc-section" id="sec-mach_table">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Isentropic Mach Table</span>
+          <span class="panel-sub">Auto-generated reference</span>
+        </div>
+        <div class="panel-body">
+          <div class="input-row triple">
+            <div class="field">
+              <label>Mach Start</label>
+              <div class="field-wrap">
+                <input type="number" id="mt-start" value="0.1" step="0.1" min="0.1" />
+              </div>
+            </div>
+            <div class="field">
+              <label>Mach End</label>
+              <div class="field-wrap">
+                <input type="number" id="mt-end" value="4.0" step="0.1" min="0.2" />
+              </div>
+            </div>
+            <div class="field">
+              <label>Step</label>
+              <div class="field-wrap">
+                <input type="number" id="mt-step" value="0.2" step="0.05" min="0.05" />
+              </div>
+            </div>
+          </div>
+          <button class="calc-btn" onclick="buildMachTable()">Generate Table →</button>
+        </div>
+      </div>
+      <div class="panel" id="mt-results" style="display:none">
+        <div class="panel-header"><span class="panel-title">Isentropic Table</span></div>
+        <div class="panel-body" style="padding:0; overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>M</th><th>T/T₀</th><th>P/P₀</th><th>ρ/ρ₀</th><th>A/A*</th><th>Regime</th>
+              </tr>
+            </thead>
+            <tbody id="mt-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ AREA-MACH ════ -->
+    <div class="calc-section" id="sec-area_mach">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Area–Mach Number Solver</span>
+          <span class="panel-sub">Find M from A/A*</span>
+        </div>
+        <div class="panel-body">
+          <div class="eq-box">
+            <div class="eq-title">Area Ratio</div>
+            A/A* = (1/M)·[(2/(γ+1))·(1+(γ-1)/2·M²)]^((γ+1)/(2(γ-1)))<br>
+            Solved numerically via Newton–Raphson iteration.
+          </div>
+          <div class="input-row">
+            <div class="field">
+              <label>Area Ratio A/A*</label>
+              <div class="field-wrap">
+                <input type="number" id="am-ratio" placeholder="e.g. 2.964" step="0.01" min="1" />
+                <span class="field-unit">—</span>
+              </div>
+            </div>
+            <div class="field">
+              <label>γ</label>
+              <div class="field-wrap">
+                <input type="number" id="am-gamma" value="1.4" step="0.01" />
+                <span class="field-unit">—</span>
+              </div>
+            </div>
+          </div>
+          <button class="calc-btn" onclick="calcAreaMach()">Solve →</button>
+        </div>
+      </div>
+      <div class="panel" id="am-results" style="display:none">
+        <div class="panel-header"><span class="panel-title">Solutions</span></div>
+        <div class="panel-body"><div class="results-grid" id="am-grid"></div></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── HELPERS ─────────────────────────────────────────────────
+const fmt = (v, d=4) => isFinite(v) ? v.toFixed(d) : '—';
+const deg2rad = d => d * Math.PI / 180;
+const rad2deg = r => r * 180 / Math.PI;
+
+function regimeBadge(M) {
+  if (M < 0.8)  return ['SUBSONIC',   'regime-subsonic'];
+  if (M < 1.2)  return ['TRANSONIC',  'regime-transonic'];
+  if (M < 5.0)  return ['SUPERSONIC', 'regime-supersonic'];
+  return             ['HYPERSONIC', 'regime-hypersonic'];
+}
+
+function machBarStyle(M) {
+  const pct = Math.min(M / 6 * 100, 100);
+  let color;
+  if (M < 0.8)      color = 'var(--accent3)';
+  else if (M < 1.2) color = 'var(--accent2)';
+  else if (M < 5)   color = 'var(--accent)';
+  else              color = '#c084fc';
+  return { pct, color };
+}
+
+function makeCards(cards) {
+  return cards.map(c => `
+    <div class="result-card ${c.hi ? 'highlight' : ''}">
+      <div class="r-label">${c.label}</div>
+      <div class="r-val">${c.val}</div>
+      <div class="r-unit">${c.unit || ''}</div>
+    </div>`).join('');
+}
+
+function showResults(panelId, gridId, cards) {
+  document.getElementById(panelId).style.display = 'block';
+  document.getElementById(gridId).innerHTML = makeCards(cards);
+}
+
+// ── MODE SWITCH ──────────────────────────────────────────────
+function switchMode(mode) {
+  document.querySelectorAll('.calc-section').forEach(s => s.classList.remove('visible'));
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-' + mode).classList.add('visible');
+  document.getElementById('btn-' + mode).classList.add('active');
+}
+
+// ── ISENTROPIC ───────────────────────────────────────────────
+function calcIsentropic() {
+  const M = parseFloat(document.getElementById('iso-mach').value);
+  const g = parseFloat(document.getElementById('iso-gamma').value) || 1.4;
+  if (!M || M < 0) return alert('Enter a valid Mach number.');
+
+  const TT0  = 1 / (1 + (g-1)/2 * M*M);
+  const PP0  = Math.pow(TT0, g/(g-1));
+  const rr0  = Math.pow(TT0, 1/(g-1));
+  const AA   = (1/M) * Math.pow((2/(g+1))*(1+(g-1)/2*M*M), (g+1)/(2*(g-1)));
+  const a_a  = M < 1e-6 ? Infinity : AA;
+  const Vcr  = Math.sqrt((2*g/(g+1)) * (1 + (g-1)/2*M*M) / (1)) ; // V/a* = M*sqrt(...) simplified
+  const Mstar= M * Math.sqrt(TT0 / ((2/(g+1))));
+
+  const [regime, cls] = regimeBadge(M);
+  document.getElementById('iso-regime-badge').innerHTML =
+    `<span class="regime-badge ${cls}">${regime}</span>`;
+
+  const { pct, color } = machBarStyle(M);
+  const bar = document.getElementById('iso-mach-bar');
+  bar.style.width = pct + '%';
+  bar.style.background = color;
+
+  showResults('iso-results', 'iso-grid', [
+    { label: 'Mach Number', val: fmt(M,3), unit: 'M', hi: true },
+    { label: 'T / T₀',      val: fmt(TT0),  unit: 'static / total' },
+    { label: 'P / P₀',      val: fmt(PP0),  unit: 'static / total' },
+    { label: 'ρ / ρ₀',      val: fmt(rr0),  unit: 'static / total' },
+    { label: 'A / A*',       val: isFinite(a_a) ? fmt(a_a) : '∞', unit: 'area ratio' },
+    { label: 'M*',           val: fmt(Mstar), unit: 'critical Mach' },
+  ]);
+}
+
+// ── NORMAL SHOCK ─────────────────────────────────────────────
+function calcNormalShock() {
+  const M1 = parseFloat(document.getElementById('ns-mach').value);
+  const g  = parseFloat(document.getElementById('ns-gamma').value) || 1.4;
+  if (!M1 || M1 < 1) return alert('Normal shocks require M₁ ≥ 1.');
+
+  const M2sq = (M1*M1 + 2/(g-1)) / (2*g/(g-1)*M1*M1 - 1);
+  const M2   = Math.sqrt(M2sq);
+  const P2P1 = 1 + 2*g/(g+1)*(M1*M1 - 1);
+  const r2r1 = (g+1)*M1*M1 / (2 + (g-1)*M1*M1);
+  const T2T1 = P2P1 / r2r1;
+  const P02P01 = Math.pow(r2r1, g/(g-1)) / Math.pow(P2P1, 1/(g-1));
+  const stag_press_loss = 1 - P02P01;
+
+  showResults('ns-results', 'ns-grid', [
+    { label: 'M₁ (upstream)',   val: fmt(M1,3),       unit: '',                  hi: true },
+    { label: 'M₂ (downstream)', val: fmt(M2,4),       unit: 'always < 1',        hi: true },
+    { label: 'P₂ / P₁',         val: fmt(P2P1),       unit: 'pressure ratio' },
+    { label: 'T₂ / T₁',         val: fmt(T2T1),       unit: 'temperature ratio' },
+    { label: 'ρ₂ / ρ₁',         val: fmt(r2r1),       unit: 'density ratio' },
+    { label: 'P₀₂ / P₀₁',       val: fmt(P02P01),     unit: 'stag. press. ratio' },
+  ]);
+}
+
+// ── OBLIQUE SHOCK ────────────────────────────────────────────
+function calcObliqueShock() {
+  const M1    = parseFloat(document.getElementById('ob-mach').value);
+  const theta = deg2rad(parseFloat(document.getElementById('ob-theta').value));
+  const g     = parseFloat(document.getElementById('ob-gamma').value) || 1.4;
+  const sol   = document.getElementById('ob-solution').value;
+  if (!M1 || M1 < 1) return alert('Enter M₁ ≥ 1.');
+  if (!theta)         return alert('Enter deflection angle θ.');
+
+  // Solve θ-β-M numerically for β
+  function thetaFromBeta(beta) {
+    const num = M1*M1 * Math.sin(beta)*Math.sin(beta) - 1;
+    const den = M1*M1 * (g + Math.cos(2*beta)) + 2;
+    return Math.atan(2 / Math.tan(beta) * num / den);
+  }
+
+  // Scan for solutions
+  let betas = [];
+  let prev = -1;
+  for (let bd = 1; bd < 90; bd += 0.1) {
+    const br = deg2rad(bd);
+    const t  = thetaFromBeta(br);
+    if (prev > 0 && t < prev && betas.length === 0) betas.push(br); // weak
+    if (t > theta && prev <= theta && betas.length === 1) betas.push(br); // strong candidate
+    prev = t;
+  }
+
+  // Newton-Raphson refinement
+  function refine(beta0) {
+    let b = beta0;
+    for (let i = 0; i < 50; i++) {
+      const f  = thetaFromBeta(b) - theta;
+      const df = (thetaFromBeta(b+1e-6) - thetaFromBeta(b-1e-6)) / 2e-6;
+      b -= f/df;
+    }
+    return b;
+  }
+
+  // Find weak & strong shock betas by searching
+  let betaWeak = null, betaStrong = null;
+  let maxTheta = -Infinity, maxBeta = 0;
+  for (let bd = 1; bd < 89.9; bd += 0.05) {
+    const br = deg2rad(bd);
+    const t  = thetaFromBeta(br);
+    if (t > maxTheta) { maxTheta = t; maxBeta = br; }
+  }
+
+  if (theta > maxTheta) return alert(`Maximum deflection angle for M=${M1} is ${rad2deg(maxTheta).toFixed(1)}°. Detached shock.`);
+
+  // weak: beta < maxBeta, strong: beta > maxBeta
+  function bisect(lo, hi, target) {
+    for (let i = 0; i < 100; i++) {
+      const mid = (lo+hi)/2;
+      if (thetaFromBeta(mid) > target) lo = mid; else hi = mid;
+    }
+    return (lo+hi)/2;
+  }
+
+  betaWeak   = bisect(deg2rad(1),    maxBeta,       theta);
+  betaStrong = bisect(maxBeta,       deg2rad(89.9), theta);
+
+  const beta = (sol === 'weak') ? betaWeak : betaStrong;
+  const Mn1  = M1 * Math.sin(beta);
+  const Mn2sq= (Mn1*Mn1 + 2/(g-1)) / (2*g/(g-1)*Mn1*Mn1 - 1);
+  const Mn2  = Math.sqrt(Mn2sq);
+  const M2   = Mn2 / Math.sin(beta - theta);
+  const P2P1 = 1 + 2*g/(g+1)*(Mn1*Mn1 - 1);
+  const r2r1 = (g+1)*Mn1*Mn1 / (2 + (g-1)*Mn1*Mn1);
+  const T2T1 = P2P1 / r2r1;
+
+  showResults('ob-results', 'ob-grid', [
+    { label: 'Shock Angle β',    val: fmt(rad2deg(beta),2), unit: 'degrees',         hi: true },
+    { label: 'M₂ (downstream)',  val: fmt(M2,4),            unit: '',                hi: true },
+    { label: 'Mn₁',              val: fmt(Mn1,4),           unit: 'normal component' },
+    { label: 'Mn₂',              val: fmt(Mn2,4),           unit: 'normal component' },
+    { label: 'P₂ / P₁',          val: fmt(P2P1),            unit: 'pressure ratio' },
+    { label: 'T₂ / T₁',          val: fmt(T2T1),            unit: 'temp ratio' },
+  ]);
+}
+
+// ── FANNO ────────────────────────────────────────────────────
+function calcFanno() {
+  const M = parseFloat(document.getElementById('fa-mach').value);
+  const g = parseFloat(document.getElementById('fa-gamma').value) || 1.4;
+  if (!M || M <= 0) return alert('Enter M > 0.');
+
+  const fac  = 1 + (g-1)/2 * M*M;
+  const TTs  = (g+1) / (2*fac);
+  const PPs  = (1/M) * Math.sqrt(TTs);
+  const rrs  = 1/(M * Math.sqrt(TTs));
+  const P0Ps = (1/M) * Math.pow((2/(g+1))*fac, (g+1)/(2*(g-1)));
+  const fL   = (1-M*M)/(g*M*M) + (g+1)/(2*g)*Math.log((g+1)*M*M/(2*fac));
+  const V0   = M * Math.sqrt(TTs); // V/V*
+
+  showResults('fa-results', 'fa-grid', [
+    { label: 'Mach',     val: fmt(M,3),   unit: '',          hi: true },
+    { label: 'T / T*',   val: fmt(TTs),   unit: 'Fanno' },
+    { label: 'P / P*',   val: fmt(PPs),   unit: 'Fanno' },
+    { label: 'ρ / ρ*',   val: fmt(rrs),   unit: 'Fanno' },
+    { label: 'P₀ / P₀*', val: fmt(P0Ps),  unit: 'Fanno' },
+    { label: '4fL* / D', val: fmt(fL),    unit: 'friction param', hi: true },
+  ]);
+}
+
+// ── RAYLEIGH ─────────────────────────────────────────────────
+function calcRayleigh() {
+  const M = parseFloat(document.getElementById('ra-mach').value);
+  const g = parseFloat(document.getElementById('ra-gamma').value) || 1.4;
+  if (!M || M <= 0) return alert('Enter M > 0.');
+
+  const denom = 1 + g*M*M;
+  const PPs   = (g+1) / denom;
+  const TTs   = M*M * Math.pow((g+1)/denom, 2);
+  const rrs   = 1/(M*M) * (denom/(g+1));  // inverse of V/V*
+  const fac   = 1 + (g-1)/2*M*M;
+  const T0T0s = 2*(g+1)*M*M*(2+(g-1)*M*M) / (denom*denom);
+  const P0P0s = (g+1)/denom * Math.pow((2/(g+1))*fac, g/(g-1));
+
+  showResults('ra-results', 'ra-grid', [
+    { label: 'Mach',      val: fmt(M,3),   unit: '',           hi: true },
+    { label: 'T / T*',    val: fmt(TTs),   unit: 'Rayleigh' },
+    { label: 'P / P*',    val: fmt(PPs),   unit: 'Rayleigh' },
+    { label: 'ρ* / ρ',    val: fmt(rrs),   unit: 'Rayleigh' },
+    { label: 'T₀ / T₀*',  val: fmt(T0T0s), unit: 'Rayleigh',   hi: true },
+    { label: 'P₀ / P₀*',  val: fmt(P0P0s), unit: 'Rayleigh' },
+  ]);
+}
+
+// ── MACH TABLE ───────────────────────────────────────────────
+function buildMachTable() {
+  const M0   = parseFloat(document.getElementById('mt-start').value) || 0.1;
+  const Mend = parseFloat(document.getElementById('mt-end').value)   || 4.0;
+  const dM   = parseFloat(document.getElementById('mt-step').value)  || 0.2;
+  const g    = 1.4;
+
+  let rows = '';
+  for (let M = M0; M <= Mend + 1e-9; M += dM) {
+    const Mc  = Math.round(M*1000)/1000;
+    const fac = 1 + (g-1)/2*Mc*Mc;
+    const TT0 = 1/fac;
+    const PP0 = Math.pow(TT0, g/(g-1));
+    const rr0 = Math.pow(TT0, 1/(g-1));
+    const AA  = Mc < 0.001 ? 9999 : (1/Mc)*Math.pow((2/(g+1))*fac, (g+1)/(2*(g-1)));
+    const [regime] = regimeBadge(Mc);
+    const col = Mc < 0.8 ? 'accent3' : Mc < 1.2 ? 'orange' : 'accent';
+    rows += `<tr>
+      <td class="${col}">${Mc.toFixed(2)}</td>
+      <td>${TT0.toFixed(4)}</td>
+      <td>${PP0.toFixed(4)}</td>
+      <td>${rr0.toFixed(4)}</td>
+      <td>${AA > 999 ? '∞' : AA.toFixed(4)}</td>
+      <td><span style="font-size:0.65rem;color:var(--muted2)">${regime}</span></td>
+    </tr>`;
+  }
+
+  document.getElementById('mt-tbody').innerHTML = rows;
+  document.getElementById('mt-results').style.display = 'block';
+}
+
+// ── AREA-MACH ────────────────────────────────────────────────
+function areaRatio(M, g) {
+  const fac = 1 + (g-1)/2*M*M;
+  return (1/M)*Math.pow((2/(g+1))*fac, (g+1)/(2*(g-1)));
+}
+
+function areaRatioDeriv(M, g) {
+  return (areaRatio(M+1e-7,g) - areaRatio(M-1e-7,g)) / 2e-7;
+}
+
+function newtonSolveArea(AR, g, M0) {
+  let M = M0;
+  for (let i = 0; i < 100; i++) {
+    const f  = areaRatio(M, g) - AR;
+    const df = areaRatioDeriv(M, g);
+    M -= f/df;
+    if (Math.abs(f) < 1e-10) break;
+  }
+  return M;
+}
+
+function calcAreaMach() {
+  const AR = parseFloat(document.getElementById('am-ratio').value);
+  const g  = parseFloat(document.getElementById('am-gamma').value) || 1.4;
+  if (!AR || AR < 1) return alert('A/A* must be ≥ 1.');
+
+  const Msub  = newtonSolveArea(AR, g, 0.5);
+  const Msup  = newtonSolveArea(AR, g, 2.5);
+
+  // Isentropic props for both solutions
+  function props(M) {
+    const fac = 1+(g-1)/2*M*M;
+    return {
+      PP0: Math.pow(1/fac, g/(g-1)),
+      TT0: 1/fac,
+    };
+  }
+  const ps = props(Msub), pp = props(Msup);
+
+  showResults('am-results', 'am-grid', [
+    { label: 'A/A* Input',      val: fmt(AR,4),       unit: 'area ratio',   hi: false },
+    { label: 'M (subsonic)',     val: fmt(Msub,5),     unit: 'M < 1',        hi: true  },
+    { label: 'M (supersonic)',   val: fmt(Msup,5),     unit: 'M > 1',        hi: true  },
+    { label: 'P/P₀ (sub)',       val: fmt(ps.PP0),     unit: 'isentropic' },
+    { label: 'P/P₀ (sup)',       val: fmt(pp.PP0),     unit: 'isentropic' },
+    { label: 'T/T₀ (sub)',       val: fmt(ps.TT0),     unit: 'isentropic' },
+  ]);
+}
+
+// ── ENTER KEY SHORTCUTS ──────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const active = document.querySelector('.calc-section.visible');
+  if (!active) return;
+  const btn = active.querySelector('.calc-btn');
+  if (btn) btn.click();
+});
+</script>
+</body>
+</html>
